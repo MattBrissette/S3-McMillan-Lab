@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>S3 McMillan Lab</title>
+    <meta name="description" content="We help B2B and B2C brands grow through clarity-driven strategy and creative campaigns that drive results.">
+    
+    <!-- Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandPurple: '#A091FF',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;800;900&display=swap');
+        
+        :root {
+            --bg-color: #030406;
+            --accent-ui: #A091FF;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(160, 145, 255, 0.2);
+            --ui-font-size: 10px;
+            --ui-letter-spacing: 0.4em;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #main-viewport {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        #webgl-canvas-container {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none; 
+        }
+
+        #css-3d-container {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        #ui-top-left {
+            position: fixed;
+            top: 40px;
+            left: 40px;
+            z-index: 100;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        #ui-bottom-left {
+            position: fixed;
+            bottom: 40px;
+            left: 40px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        #ui-bottom-right {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            z-index: 100;
+            text-align: right;
+            pointer-events: auto;
+        }
+
+        #audio-controls {
+            position: fixed;
+            top: 40px;
+            right: 40px;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .ui-label-base {
+            font-size: var(--ui-font-size);
+            letter-spacing: var(--ui-letter-spacing);
+            text-transform: uppercase;
+            font-weight: 800;
+            color: var(--accent-ui);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .audio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+            height: 38px;
+        }
+
+        .audio-toggle:hover {
+            border-color: var(--accent-ui);
+            background: rgba(160, 145, 255, 0.1);
+        }
+
+        .audio-icon {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            overflow: hidden;
+        }
+
+        .audio-bar {
+            width: 2px;
+            height: 4px;
+            background: var(--accent-ui);
+            border-radius: 1px;
+            transition: height 0.1s ease;
+        }
+
+        .corner-label {
+            opacity: 0.6;
+            padding: 12px 0;
+            display: inline-block;
+        }
+
+        .interactive-label {
+            cursor: pointer;
+            padding: 12px 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 30px;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            background: rgba(0, 0, 0, 0.3);
+            display: inline-block;
+            backdrop-filter: blur(8px);
+        }
+
+        .interactive-label:hover {
+            background: rgba(160, 145, 255, 0.15);
+            border-color: var(--accent-ui);
+            box-shadow: 0 0 20px rgba(160, 145, 255, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .interactive-label:active {
+            transform: scale(0.95);
+        }
+
+        .frost-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        .prism-panel {
+            width: 420px;
+            height: 640px;
+            padding: 60px 40px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+            pointer-events: auto; 
+            backface-visibility: hidden;
+            transform-style: preserve-3d;
+            transition: opacity 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+            
+            -webkit-mask-image: radial-gradient(circle at center, black 40%, rgba(0,0,0,0.4) 85%, transparent 100%);
+            mask-image: radial-gradient(circle at center, black 40%, rgba(0,0,0,0.4) 85%, transparent 100%);
+        }
+
+        .prism-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 100px rgba(160, 145, 255, 0.05);
+            pointer-events: none;
+        }
+
+        .cap-panel {
+            width: 480px;
+            height: 480px;
+            background: rgba(160, 145, 255, 0.04);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border-radius: 50%;
+            pointer-events: auto;
+            backdrop-filter: blur(15px);
+            position: relative;
+            overflow: hidden;
+            backface-visibility: hidden;
+            transition: opacity 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+            
+            -webkit-mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+            mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+        }
+
+        .btn-action {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 12px 24px;
+            border: 1px solid var(--accent-ui);
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: transparent;
+            color: var(--accent-ui);
+            position: relative; z-index: 10;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-action:hover {
+            background: var(--accent-ui);
+            color: black;
+            box-shadow: 0 0 30px rgba(160, 145, 255, 0.4);
+        }
+
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: #030406;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1s ease;
+        }
+
+        .logo-top {
+            width: 240px; height: auto;
+            mix-blend-mode: screen; opacity: 0.9;
+            filter: drop-shadow(0 0 10px rgba(160, 145, 255, 0.4));
+        }
+
+        .panel-body-copy {
+            font-size: 1.05rem; line-height: 1.6;
+            color: rgba(255, 255, 255, 0.85);
+            font-family: 'Inter', sans-serif; font-weight: 400;
+        }
+
+        h1, h2 { font-family: 'Inter', sans-serif; letter-spacing: -0.04em; }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="ui-label-base opacity-50 animate-pulse">Loading S3 McMillan Lab...</div>
+    </div>
+
+    <div id="ui-top-left">
+        <h1 class="text-2xl font-black uppercase leading-none">S3 McMillan Lab</h1>
+    </div>
+
+    <div id="audio-controls">
+        <div class="audio-toggle" id="audio-btn">
+            <div class="audio-icon" id="audio-anim">
+                <div class="audio-bar"></div>
+                <div class="audio-bar"></div>
+                <div class="audio-bar"></div>
+            </div>
+            <span class="ui-label-base text-brandPurple/80" id="audio-status">Audio Off</span>
+        </div>
+    </div>
+
+    <div id="ui-bottom-left">
+        <span class="ui-label-base corner-label">drag and scroll to explore</span>
+    </div>
+
+    <div id="ui-bottom-right">
+        <button class="ui-label-base interactive-label" id="spin-btn">spin the prism</button>
+    </div>
+
+    <div id="main-viewport">
+        <div id="webgl-canvas-container"></div>
+        <div id="css-3d-container"></div>
+    </div>
+
+    <!-- UI Templates -->
+    <div id="templates" style="position: absolute; left: -9999px; top: -9999px;">
+        <div id="tpl-top">
+            <div class="cap-panel">
+                <div class="frost-overlay"></div>
+                <img src="https://i.postimg.cc/bN7CmnFh/S3M-Logo2.jpg" class="logo-top relative z-10" alt="S3 McMillan Logo">
+            </div>
+        </div>
+        <div id="tpl-1">
+            <div class="prism-panel">
+                <div class="frost-overlay"></div>
+                <span class="ui-label-base opacity-40 mb-8 relative z-10">01 / Profile</span>
+                <h2 class="text-5xl font-black uppercase mb-6 leading-[0.9] text-white relative z-10">S3 McMillan</h2>
+                <p class="panel-body-copy mb-6 relative z-10">S3 McMillan is the full-service creative agency that empowers brands and drives demand with compelling clarity.</p>
+                <div class="h-px w-12 bg-brandPurple/30 relative z-10"></div>
+            </div>
+        </div>
+        <div id="tpl-empty-1">
+            <div class="prism-panel"><div class="frost-overlay"></div><span class="ui-label-base opacity-30 relative z-10">02</span></div>
+        </div>
+        <div id="tpl-2">
+            <div class="prism-panel">
+                <div class="frost-overlay"></div>
+                <span class="ui-label-base opacity-40 mb-8 relative z-10">03 / Exploration</span>
+                <h2 class="text-4xl font-black uppercase mb-6 leading-[0.9] text-white relative z-10">Experiments start with curiosity.</h2>
+                <p class="panel-body-copy mb-6 relative z-10">Explore our ongoing process—sketches, prototypes, and ideas, all in motion. No order, just discovery.</p>
+                <div class="h-px w-12 bg-brandPurple/30 relative z-10"></div>
+            </div>
+        </div>
+        <div id="tpl-empty-2">
+            <div class="prism-panel"><div class="frost-overlay"></div><span class="ui-label-base opacity-30 relative z-10"></span></div>
+        </div>
+        <div id="tpl-3">
+            <div class="prism-panel items-center text-center">
+                <div class="frost-overlay"></div>
+                <span class="ui-label-base opacity-40 mb-8 relative z-10">02 / Connection</span>
+                <h2 class="text-4xl font-black uppercase mb-4 text-white relative z-10">Let's Connect</h2>
+                <button onclick="handleLinkedInAction()" class="btn-action relative z-10">View LinkedIn</button>
+            </div>
+        </div>
+        <div id="tpl-empty-3">
+            <div class="prism-panel"><div class="frost-overlay"></div><span class="ui-label-base opacity-30 relative z-10"></span></div>
+        </div>
+        <div id="tpl-bottom">
+            <div class="cap-panel">
+                <div class="frost-overlay"></div>
+                <div class="ui-label-base opacity-20 relative z-10" style="letter-spacing: 0.8em">You’ve gone beneath the surface</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ChromaticAberrationShader = {
+            uniforms: { "tDiffuse": { value: null }, "amount": { value: 0.005 }, "center": { value: new THREE.Vector2(0.5, 0.5) } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+                uniform sampler2D tDiffuse; uniform float amount; uniform vec2 center; varying vec2 vUv;
+                void main() {
+                    vec2 dist = vUv - center;
+                    vec4 color;
+                    color.r = texture2D(tDiffuse, vUv + dist * amount).r;
+                    color.g = texture2D(tDiffuse, vUv).g;
+                    color.b = texture2D(tDiffuse, vUv - dist * amount).b;
+                    color.a = texture2D(tDiffuse, vUv).a;
+                    gl_FragColor = color;
+                }
+            `
+        };
+
+        let scene, camera, renderer, cssRenderer, composer, bloomPass, chromaticPass, controls, prismGroup;
+        let iceCore, bubbles, frostShell, snowflakes;
+        let fogLayers = [], innerFogLayers = [];
+        const sideCount = 6, panelWidth = 420, panelHeight = 640;
+        let prismPanels = [], isExploded = false;
+        let lastAzimuthAngle = 0, rotationVelocity = 0, blueMomentum = 0, isSpinningManually = false;
+
+        // Audio System
+        let audioCtx, masterGain, pannerNode, audioInitialized = false, isAudioPlaying = false;
+        let ambientNoiseFilter, frictionNoiseGain, frictionNoiseFilter;
+
+        function initAudio() {
+            if (audioInitialized) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.connect(audioCtx.destination);
+                masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                pannerNode = audioCtx.createPanner();
+                pannerNode.connect(masterGain);
+                
+                const bufferSize = 2 * audioCtx.sampleRate;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+                
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = noiseBuffer;
+                whiteNoise.loop = true;
+                ambientNoiseFilter = audioCtx.createBiquadFilter();
+                ambientNoiseFilter.type = 'lowpass';
+                ambientNoiseFilter.frequency.setValueAtTime(100, audioCtx.currentTime);
+                whiteNoise.connect(ambientNoiseFilter);
+                ambientNoiseFilter.connect(pannerNode);
+                
+                const frictionSource = audioCtx.createBufferSource();
+                frictionSource.buffer = noiseBuffer;
+                frictionSource.loop = true;
+                frictionNoiseFilter = audioCtx.createBiquadFilter();
+                frictionNoiseFilter.type = 'bandpass';
+                frictionNoiseFilter.frequency.setValueAtTime(2000, audioCtx.currentTime);
+                frictionNoiseFilter.Q.setValueAtTime(2.0, audioCtx.currentTime);
+                frictionNoiseGain = audioCtx.createGain();
+                frictionNoiseGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                frictionSource.connect(frictionNoiseFilter);
+                frictionNoiseFilter.connect(frictionNoiseGain);
+                frictionNoiseGain.connect(pannerNode);
+                
+                whiteNoise.start(); frictionSource.start();
+                audioInitialized = true;
+            } catch(e) { console.warn("Audio Context failed", e); }
+        }
+
+        /**
+         * PROCEDURAL GLASS SHATTER LOGIC
+         * - Avoids clean oscillator sweeps (laser sounds)
+         * - Uses high-pass noise bursts for impact
+         * - Uses "inharmonic" resonators for the sound of debris/shards
+         */
+        function playShatterSFX(isImplosion = false) {
+            if (!audioCtx || !isAudioPlaying) return;
+
+            const now = audioCtx.currentTime;
+            
+            // Create a small group of "shards" (short resonant pulses)
+            const numShards = isImplosion ? 3 : 8;
+            
+            for (let i = 0; i < numShards; i++) {
+                const startTime = now + (i * (Math.random() * 0.05));
+                const duration = 0.1 + (Math.random() * 0.2);
+                
+                // 1. High-frequency noise burst (The "crack")
+                const crackNode = audioCtx.createBufferSource();
+                const noiseSize = audioCtx.sampleRate * 0.1;
+                const noiseBuffer = audioCtx.createBuffer(1, noiseSize, audioCtx.sampleRate);
+                const data = noiseBuffer.getChannelData(0);
+                for (let j = 0; j < noiseSize; j++) data[j] = Math.random() * 2 - 1;
+                crackNode.buffer = noiseBuffer;
+
+                const hpFilter = audioCtx.createBiquadFilter();
+                hpFilter.type = "highpass";
+                hpFilter.frequency.setValueAtTime(3000 + Math.random() * 5000, startTime);
+
+                const crackGain = audioCtx.createGain();
+                crackGain.gain.setValueAtTime(0, startTime);
+                crackGain.gain.linearRampToValueAtTime(isImplosion ? 0.02 : 0.06, startTime + 0.005);
+                crackGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+
+                crackNode.connect(hpFilter);
+                hpFilter.connect(crackGain);
+                crackGain.connect(masterGain);
+                crackNode.start(startTime);
+                crackNode.stop(startTime + 0.1);
+
+                // 2. Resonant Bell Tones (The "shards")
+                // Using irregular frequencies prevents the "laser" feel
+                const resonanceFreqs = [2134, 3567, 4892, 7123];
+                resonanceFreqs.forEach(freq => {
+                    const osc = audioCtx.createOscillator();
+                    const oscGain = audioCtx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq * (0.9 + Math.random() * 0.2), startTime);
+                    
+                    oscGain.gain.setValueAtTime(0, startTime);
+                    oscGain.gain.linearRampToValueAtTime(isImplosion ? 0.01 : 0.03, startTime + 0.01);
+                    oscGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+                    
+                    osc.connect(oscGain);
+                    oscGain.connect(masterGain);
+                    osc.start(startTime);
+                    osc.stop(startTime + duration + 0.1);
+                });
+            }
+        }
+
+        function toggleAudio() {
+            if (!audioInitialized) initAudio();
+            if (isAudioPlaying) {
+                masterGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                document.getElementById('audio-status').innerText = 'Audio Off';
+                isAudioPlaying = false;
+                document.querySelectorAll('.audio-bar').forEach(bar => bar.style.height = '4px');
+            } else {
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                masterGain.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.5);
+                document.getElementById('audio-status').innerText = 'Audio On';
+                isAudioPlaying = true;
+            }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030508, 0.0001);
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.set(1600, 800, 1600);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.getElementById('webgl-canvas-container').appendChild(renderer.domElement);
+            
+            cssRenderer = new THREE.CSS3DRenderer();
+            cssRenderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('css-3d-container').appendChild(cssRenderer.domElement);
+            
+            composer = new THREE.EffectComposer(renderer);
+            composer.addPass(new THREE.RenderPass(scene, camera));
+            bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.5, 0.3);
+            composer.addPass(bloomPass);
+            chromaticPass = new THREE.ShaderPass(ChromaticAberrationShader);
+            chromaticPass.uniforms["amount"].value = 0;
+            composer.addPass(chromaticPass);
+            
+            prismGroup = new THREE.Group();
+            scene.add(prismGroup);
+            
+            setupPrism(); setupFrozenCavern(); setupParticles(); setupAtmosphericFog(); setupLights();
+            
+            controls = new THREE.OrbitControls(camera, cssRenderer.domElement);
+            controls.enableDamping = true; controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5; controls.enablePan = false;
+            
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('audio-btn').addEventListener('click', toggleAudio);
+            document.getElementById('spin-btn').addEventListener('click', () => handleSpinPrism(40));
+            
+            document.addEventListener("visibilitychange", () => { if (!document.hidden && isExploded) handleImplodePrism(); });
+
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 1000); }
+            }, 1500);
+            animate();
+        }
+
+        function setupAtmosphericFog() {
+            const fogGroup = new THREE.Group();
+            scene.add(fogGroup);
+            const size = 512; 
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const context = canvas.getContext('2d');
+            const gradient = context.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+            gradient.addColorStop(0, 'rgba(176, 231, 255, 0.2)');
+            gradient.addColorStop(0.4, 'rgba(176, 231, 255, 0.05)');
+            gradient.addColorStop(1, 'rgba(176, 231, 255, 0)');
+            context.fillStyle = gradient; context.fillRect(0, 0, size, size);
+            const texture = new THREE.CanvasTexture(canvas);
+            const fogGeo = new THREE.PlaneGeometry(3500, 3500); 
+            for (let i = 0; i < 6; i++) {
+                const mesh = new THREE.Mesh(fogGeo, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+                mesh.position.y = -600 + (i * 60); mesh.rotation.x = -Math.PI / 2;
+                fogGroup.add(mesh);
+                fogLayers.push({ mesh, offset: Math.random() * 100, driftSpeed: 0.0002 + (Math.random() * 0.0004) });
+            }
+            const innerFogGeo = new THREE.PlaneGeometry(800, 800);
+            for (let i = 0; i < 3; i++) {
+                const mesh = new THREE.Mesh(innerFogGeo, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+                mesh.position.y = -350 + (i * 40); mesh.rotation.x = -Math.PI / 2;
+                prismGroup.add(mesh);
+                innerFogLayers.push({ mesh, offset: Math.random() * 50, driftSpeed: 0.0008 + (Math.random() * 0.0015) });
+            }
+        }
+
+        function setupFrozenCavern() {
+            const cavernGroup = new THREE.Group();
+            prismGroup.add(cavernGroup);
+            const coreRadius = 110; 
+            const geo = new THREE.TetrahedronGeometry(coreRadius, 4);
+            const pos = geo.attributes.position;
+            const vector = new THREE.Vector3();
+            for(let i=0; i < pos.count; i++) {
+                vector.fromBufferAttribute(pos, i);
+                const noise = (Math.random() - 0.5) * 25;
+                vector.multiplyScalar(1 + (Math.random() * 0.12));
+                vector.y *= 2.4;
+                pos.setXYZ(i, vector.x + noise, vector.y + noise, vector.z + noise);
+            }
+            geo.computeVertexNormals();
+            iceCore = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ 
+                color: 0x90e0ff, metalness: 0.1, roughness: 0.15, transmission: 0.95, thickness: 150, ior: 1.5, 
+                transparent: true, opacity: 0.95, reflectivity: 0.5, clearcoat: 0.8, clearcoatRoughness: 0.2, 
+                attenuationColor: 0xe0f7ff, attenuationDistance: 50 
+            }));
+            cavernGroup.add(iceCore);
+            const bubbleGeo = new THREE.BufferGeometry();
+            const bubblePos = [];
+            for (let i = 0; i < 100; i++) bubblePos.push((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 350, (Math.random() - 0.5) * 80);
+            bubbleGeo.setAttribute('position', new THREE.Float32BufferAttribute(bubblePos, 3));
+            bubbles = new THREE.Points(bubbleGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.5, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }));
+            iceCore.add(bubbles);
+            frostShell = new THREE.Mesh(new THREE.IcosahedronGeometry(132, 1), new THREE.MeshBasicMaterial({ color: 0xb0e7ff, wireframe: true, transparent: true, opacity: 0.1 }));
+            frostShell.scale.y = 2.2;
+            cavernGroup.add(frostShell);
+        }
+
+        function setupPrism() {
+            const angleStep = (Math.PI * 2) / sideCount;
+            const radius = ((panelWidth / 2) / Math.tan(Math.PI / sideCount)) - 3;
+            const ids = ['tpl-1', 'tpl-empty-1', 'tpl-2', 'tpl-empty-2', 'tpl-3', 'tpl-empty-3'];
+            for (let i = 0; i < sideCount; i++) {
+                const template = document.getElementById(ids[i]); if(!template) continue;
+                const el = template.firstElementChild.cloneNode(true);
+                const cssObj = new THREE.CSS3DObject(el);
+                const angle = i * angleStep;
+                const initialPos = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                cssObj.position.copy(initialPos);
+                cssObj.rotation.y = -angle + Math.PI/2;
+                prismGroup.add(cssObj);
+                const plane = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 2, panelHeight - 2), new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.0, transparent: true, side: THREE.DoubleSide }));
+                plane.position.copy(cssObj.position); plane.rotation.copy(cssObj.rotation);
+                scene.add(plane);
+                prismPanels.push({ css: cssObj, mesh: plane, basePos: initialPos.clone(), baseRot: cssObj.rotation.clone(), dir: initialPos.clone().normalize().add(new THREE.Vector3(0, (Math.random()-0.5)*2, 0)).normalize(), lerpFactor: 0 });
+            }
+            const topEl = document.getElementById('tpl-top').firstElementChild.cloneNode(true);
+            const top = new THREE.CSS3DObject(topEl);
+            top.position.y = panelHeight / 2; top.rotation.x = -Math.PI / 2;
+            prismGroup.add(top);
+            prismPanels.push({ css: top, basePos: top.position.clone(), baseRot: top.rotation.clone(), dir: new THREE.Vector3(0, 1.5, 0), lerpFactor: 0 });
+            const botEl = document.getElementById('tpl-bottom').firstElementChild.cloneNode(true);
+            const bot = new THREE.CSS3DObject(botEl);
+            bot.position.y = -panelHeight / 2; bot.rotation.x = Math.PI / 2;
+            prismGroup.add(bot);
+            prismPanels.push({ css: bot, basePos: bot.position.clone(), baseRot: bot.rotation.clone(), dir: new THREE.Vector3(0, -1.5, 0), lerpFactor: 0 });
+        }
+
+        function setupParticles() {
+            const pts = [];
+            for (let i = 0; i < 2000; i++) pts.push(THREE.MathUtils.randFloatSpread(5000), THREE.MathUtils.randFloatSpread(5000), THREE.MathUtils.randFloatSpread(5000));
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+            snowflakes = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending }));
+            scene.add(snowflakes);
+        }
+
+        function setupLights() {
+            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+            const p1 = new THREE.PointLight(0xffffff, 4); p1.position.set(1200, 1000, 1200); scene.add(p1);
+            const p2 = new THREE.PointLight(0x80d0ff, 3); p2.position.set(-1200, -500, -1200); scene.add(p2);
+            const rimLight = new THREE.PointLight(0xffffff, 15); rimLight.position.set(0, 200, -800); scene.add(rimLight);
+            const topRim = new THREE.DirectionalLight(0xffffff, 3); topRim.position.set(0, 1500, 0); scene.add(topRim);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            cssRenderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function handleLinkedInAction() {
+            handleExplodePrism(); setTimeout(() => window.open('https://www.linkedin.com/company/s3-mcmillan/', '_blank'), 1000);
+        }
+
+        function handleExplodePrism() {
+            isExploded = true; playShatterSFX(false);
+            prismPanels.forEach(p => { p.css.element.style.opacity = '0'; p.css.element.style.pointerEvents = 'none'; });
+            bloomPass.strength = 6.0; setTimeout(() => { bloomPass.strength = 1.8; }, 2000);
+        }
+
+        function handleImplodePrism() {
+            isExploded = false; playShatterSFX(true);
+            prismPanels.forEach(p => { p.css.element.style.opacity = '1'; p.css.element.style.pointerEvents = 'auto'; });
+            bloomPass.strength = 4.0; setTimeout(() => { bloomPass.strength = 1.8; }, 1500);
+        }
+
+        function handleSpinPrism(velocity = 40) {
+            if (isSpinningManually || isExploded) return;
+            isSpinningManually = true;
+            const os = controls.autoRotateSpeed; controls.autoRotateSpeed = velocity;
+            bloomPass.strength = 10.0; 
+            setTimeout(() => {
+                const interval = setInterval(() => {
+                    controls.autoRotateSpeed *= 0.94; bloomPass.strength *= 0.96;
+                    if (controls.autoRotateSpeed < os + 0.1) {
+                        controls.autoRotateSpeed = os; bloomPass.strength = 1.8; isSpinningManually = false; clearInterval(interval);
+                    }
+                }, 30);
+            }, 2500); 
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = Date.now() * 0.001;
+            const currentAzimuth = controls.getAzimuthalAngle();
+            rotationVelocity = Math.abs(currentAzimuth - lastAzimuthAngle);
+            if (rotationVelocity > Math.PI) rotationVelocity = 0;
+            lastAzimuthAngle = currentAzimuth;
+
+            const chromaAmount = Math.min(rotationVelocity * 0.8, 0.04);
+            chromaticPass.uniforms["amount"].value = chromaAmount;
+            
+            if (rotationVelocity > 0.005) blueMomentum = Math.min(blueMomentum + (rotationVelocity * 25), 3.0);
+            else blueMomentum *= 0.94; 
+
+            prismPanels.forEach(p => {
+                const targetFactor = isExploded ? 1.0 : 0.0;
+                p.lerpFactor += (targetFactor - p.lerpFactor) * 0.06;
+                const explodeDist = 800;
+                const currentPos = p.basePos.clone().add(p.dir.clone().multiplyScalar(p.lerpFactor * explodeDist));
+                p.css.position.copy(currentPos);
+                if (p.lerpFactor > 0.01) {
+                    p.css.rotation.x = p.baseRot.x + (p.lerpFactor * 2);
+                    p.css.rotation.z = p.baseRot.z + (p.lerpFactor * 1.5);
+                } else { p.css.rotation.copy(p.baseRot); }
+                if (p.mesh) { p.mesh.position.copy(p.css.position); p.mesh.rotation.copy(p.css.rotation); }
+            });
+
+            if (audioInitialized && isAudioPlaying) {
+                const frictionLevel = Math.min(rotationVelocity * 12, 1.0);
+                frictionNoiseGain.gain.setTargetAtTime(frictionLevel * 0.15, audioCtx.currentTime, 0.08);
+                frictionNoiseFilter.frequency.setTargetAtTime(1000 + (frictionLevel * 3000), audioCtx.currentTime, 0.15);
+                document.querySelectorAll('.audio-bar').forEach((bar, i) => {
+                    const h = 4 + (Math.sin(t * 12 + i) * 3 + 3) + (frictionLevel * 10);
+                    bar.style.height = Math.min(h, 24) + 'px';
+                });
+            }
+            if(iceCore) {
+                iceCore.rotation.y += 0.002 + (rotationVelocity * 0.15);
+                iceCore.scale.setScalar(1 + Math.sin(t) * 0.02);
+                iceCore.material.color.copy(new THREE.Color(0x90e0ff)).lerp(new THREE.Color(0x00a2ff), Math.min(blueMomentum, 1));
+            }
+            if(bubbles) bubbles.rotation.y -= 0.005 + (rotationVelocity * 0.08); 
+            if(frostShell) frostShell.rotation.y -= 0.001 + (rotationVelocity * 0.03); 
+            fogLayers.forEach((layer) => {
+                layer.mesh.rotation.z += layer.driftSpeed;
+                layer.mesh.position.y += Math.sin(t * 0.3 + layer.offset) * 0.12;
+                layer.mesh.material.opacity = 0.08 + Math.sin(t * 0.4 + layer.offset) * 0.02;
+            });
+            innerFogLayers.forEach((layer) => {
+                layer.mesh.rotation.z -= layer.driftSpeed * 1.5;
+                layer.mesh.position.y += Math.sin(t * 0.5 + layer.offset) * 0.1;
+                layer.mesh.material.opacity = 0.15 + Math.sin(t * 0.6 + layer.offset) * 0.05;
+            });
+            if(snowflakes) {
+                const pos = snowflakes.geometry.attributes.position.array;
+                for (let i = 1; i < pos.length; i += 3) {
+                    pos[i] -= 1.0 + (rotationVelocity * 8); if (pos[i] < -2500) pos[i] = 2500; 
+                }
+                snowflakes.geometry.attributes.position.needsUpdate = true;
+                snowflakes.rotation.y += 0.0005 + (rotationVelocity * 0.02);
+            }
+            controls.update(); composer.render(); cssRenderer.render(scene, camera);
+        }
+
+        window.onload = function () { init(); }
+    </script>
+</body>
+</html>
